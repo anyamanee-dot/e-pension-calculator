@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>โปรแกรมคำนวณเงินเกษียณข้าราชการ</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #003366; --gold: #c5a059; --bg: #f4f7f9; }
+        body { font-family: 'Sarabun', sans-serif; background-color: var(--bg); margin: 0; padding: 15px; }
+        .container { max-width: 500px; margin: auto; background: white; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: var(--primary); color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+        select, input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; box-sizing: border-box; }
+        button { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        
+        /* ส่วนกรอก 60 เดือน */
+        #gpf-section { display: none; background: #fff9e6; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #ffeeba; }
+        .salary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .salary-input-group { display: flex; flex-direction: column; }
+        .salary-input-group label { font-size: 12px; color: #666; }
+
+        .result-box { display: none; margin-top: 20px; border-top: 2px solid #eee; padding-top: 20px; }
+        .res-item { background: #f8fafc; padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 5px solid var(--gold); }
+        .res-val { font-size: 1.3rem; font-weight: bold; color: var(--primary); display: block; }
+        .death { border-left-color: #d9534f; background: #fff5f5; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2>คำนวณเงินเกษียณ 🇹🇭</h2>
+    </div>
+    
+    <div class="content">
+        <div class="form-group">
+            <label>ประเภทสมาชิก</label>
+            <select id="memberType" onchange="toggleGPF()">
+                <option value="non-gpf">ไม่ใช่สมาชิก กบข. (ใช้เงินเดือนสุดท้าย)</option>
+                <option value="gpf">เป็นสมาชิก กบข. (ใช้ค่าเฉลี่ย 60 เดือน)</option>
+            </select>
+        </div>
+
+        <div id="gpf-section">
+            <label>กรอกเงินเดือนย้อนหลัง (ถ้าเงินเดือนเท่ากันให้ใส่ยอดเดียว)</label>
+            <div class="salary-grid">
+                <div class="salary-input-group">
+                    <label>ยอดเงินเดือนที่ 1</label>
+                    <input type="number" class="avg-sal" placeholder="บาท" value="0">
+                </div>
+                <div class="salary-input-group">
+                    <label>จำนวนเดือนที่ได้รับยอดนี้</label>
+                    <input type="number" class="avg-months" placeholder="เดือน" value="0">
+                </div>
+            </div>
+            <div id="additional-salaries"></div>
+            <button type="button" onclick="addSalaryRow()" style="background:#6c757d; font-size:14px; padding:8px;">+ เพิ่มรายการเงินเดือน</button>
+            <p style="font-size:12px; color:red; margin-top:5px;">*ต้องรวมให้ครบ 60 เดือน</p>
+        </div>
+
+        <div id="normal-section" class="form-group">
+            <label id="mainSalaryLabel">เงินเดือนเดือนสุดท้าย</label>
+            <input type="number" id="mainSalary" placeholder="เช่น 50000">
+        </div>
+
+        <div class="form-group">
+            <label>เวลาราชการรวม (ปี)</label>
+            <input type="number" id="serviceYears" placeholder="เช่น 35">
+        </div>
+
+        <button onclick="calculateAll()">คำนวณเงินเกษียณ</button>
+
+        <div id="result" class="result-box">
+            <div class="res-item">
+                <small>1. เงินบำนาญรายเดือน</small>
+                <span id="pensionDisplay" class="res-val">0.00 บาท</span>
+            </div>
+            <div class="res-item">
+                <small>2. บำเหน็จดำรงชีพ (รับ 3 งวด)</small>
+                <div style="font-size:14px; margin-top:5px;">
+                    <div>• งวดแรก (เกษียณ): <span id="l1">0</span></div>
+                    <div>• งวดสอง (65 ปี): <span id="l2">0</span></div>
+                    <div>• งวดสาม (70 ปี): <span id="l3">0</span></div>
+                </div>
+                <strong>รวม: <span id="lTotal">0</span> บาท</strong>
+            </div>
+            <div class="res-item death">
+                <small>3. บำเหน็จตกทอด (ทายาท)</small>
+                <span id="deathDisplay" class="res-val" style="color:#d9534f;">0.00 บาท</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleGPF() {
+        const type = document.getElementById('memberType').value;
+        document.getElementById('gpf-section').style.display = (type === 'gpf') ? 'block' : 'none';
+        document.getElementById('normal-section').style.display = (type === 'gpf') ? 'none' : 'block';
+    }
+
+    function addSalaryRow() {
+        const div = document.createElement('div');
+        div.className = 'salary-grid';
+        div.innerHTML = `
+            <div class="salary-input-group"><input type="number" class="avg-sal" placeholder="บาท"></div>
+            <div class="salary-input-group"><input type="number" class="avg-months" placeholder="เดือน"></div>
+        `;
+        document.getElementById('additional-salaries').appendChild(div);
+    }
+
+    function calculateAll() {
+        const type = document.getElementById('memberType').value;
+        const years = parseFloat(document.getElementById('serviceYears').value);
+        let avgSalary = 0;
+
+        if (type === 'gpf') {
+            let totalMoney = 0;
+            let totalMonths = 0;
+            const sals = document.getElementsByClassName('avg-sal');
+            const months = document.getElementsByClassName('avg-months');
+            for(let i=0; i<sals.length; i++) {
+                totalMoney += (parseFloat(sals[i].value || 0) * parseFloat(months[i].value || 0));
+                totalMonths += parseFloat(months[i].value || 0);
+            }
+            if(totalMonths !== 60) {
+                alert("จำนวนเดือนต้องรวมกันให้ได้ 60 เดือน (ปัจจุบัน: " + totalMonths + ")");
+                return;
+            }
+            avgSalary = totalMoney / 60;
+        } else {
+            avgSalary = parseFloat(document.getElementById('mainSalary').value);
+        }
+
+        if (!avgSalary || !years) { alert("กรุณากรอกข้อมูลให้ครบถ้วน"); return; }
+
+        // บำนาญ
+        let pension = (avgSalary * years) / 50;
+        let cap = (type === 'gpf') ? (avgSalary * 0.7) : avgSalary;
+        if (pension > cap) pension = cap;
+
+        // บำเหน็จดำรงชีพ
+        let lifeLimit = Math.min(pension * 15, 500000);
+        let p1 = Math.min(lifeLimit, 200000);
+        let p2 = Math.min(Math.max(lifeLimit - 200000, 0), 200000);
+        let p3 = Math.min(Math.max(lifeLimit - 400000, 0), 100000);
+
+        // บำเหน็จตกทอด
+        let death = (pension * 30) - (p1 + p2 + p3);
+
+        // แสดงผล
+        const f = (n) => n.toLocaleString('th-TH', {minimumFractionDigits:2});
+        document.getElementById('pensionDisplay').innerText = f(pension) + " บาท";
+        document.getElementById('l1').innerText = f(p1);
+        document.getElementById('l2').innerText = f(p2);
+        document.getElementById('l3').innerText = f(p3);
+        document.getElementById('lTotal').innerText = f(lifeLimit);
+        document.getElementById('deathDisplay').innerText = f(death) + " บาท";
+        document.getElementById('result').style.display = 'block';
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+</script>
+</body>
+</html>
